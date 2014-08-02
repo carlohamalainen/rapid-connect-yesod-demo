@@ -2,6 +2,15 @@
 
 An example Yesod site that uses AAF's [Rapid Connect](https://rapid.aaf.edu.au/) for authorisation.
 
+## How does it work?
+
+There is a lot of code in this repo due to the scaffolding that
+you get with a Yesod 1.2 site, but only two files are of real
+importance for the purpose of this demo. First, JWT decoding and
+verification happens in [AuthJwt.hs](./Handler/AuthJwt.hs). Secondly,
+[Welcome.hs](./Handler/Welcome.hs) checks two session variables
+to ensure that the user has successfully authenticated.
+
 ## Configuration
 
 In ```Handler/AuthJwt.hs``` and edit these values:
