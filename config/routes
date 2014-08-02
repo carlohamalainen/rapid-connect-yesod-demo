@@ -1,0 +1,8 @@
+/static StaticR Static getStatic
+
+/favicon.ico FaviconR GET
+/robots.txt RobotsR GET
+
+/            HomeR       GET
+/rc/auth/jwt AuthJwtR    POST
+/welcome     WelcomeR    GET

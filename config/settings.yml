@@ -1,0 +1,19 @@
+Default: &defaults
+  host: "*4" # any IPv4 host
+  port: 80
+  approot: "https://example.com"
+  copyright: Copyright 2014 Carlo Hamalainen <carlo@carlo-hamalainen.net>
+  #analytics: UA-YOURCODE
+
+Development:
+  <<: *defaults
+
+Testing:
+  <<: *defaults
+
+Staging:
+  <<: *defaults
+
+Production:
+  #approot: "http://www.example.com"
+  <<: *defaults
