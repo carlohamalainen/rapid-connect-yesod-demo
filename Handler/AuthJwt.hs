@@ -31,7 +31,8 @@ import Control.Monad (mzero)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Char8 as BL8
+
+import Network.URI (parseURI)
 
 -- for string to char8
 import Data.ByteString.Internal (unpackBytes)
@@ -48,7 +49,7 @@ configIss = "https://rapid.test.aaf.edu.au" -- or maybe "https://rapid.aaf.edu.a
 configAudience :: T.Text
 configAudience = "https://example.com/rc"
 
-secret :: T.Text
+secret :: B.ByteString
 secret = "SECRET"
 
 -- For a description of these attributes, see https://rapid.aaf.edu.au/developers
@@ -94,7 +95,7 @@ postAuthJwtR = do
         jwk :: JOSE.JWK
         jwk = JOSE.JWK k z z z z z z z z
             where z = Nothing
-                  k = OctKeyMaterial $ OctKeyParameters Oct $ Base64Octets (BL8.pack $ T.unpack secret)
+                  k = OctKeyMaterial $ OctKeyParameters Oct $ Base64Octets secret
 
         -- Things that I have to look up:
         claimset = JWT.jwtClaimsSet jwt
