@@ -81,55 +81,59 @@ instance FromJSON AAFAttributes where
 strToWord8s :: String -> [Word8]
 strToWord8s = unpackBytes . pack
 
+decodeJWT :: T.Text -> Either JOSE.Error JWT.JWT
+decodeJWT jwtInput = JOSE.decodeCompact $ BL.pack $ strToWord8s $ T.unpack jwtInput
+
+encodeJWK :: B.ByteString -> JOSE.JWK
+encodeJWK s = JOSE.JWK k z z z z z z z z
+  where
+    z = Nothing
+    k = OctKeyMaterial $ OctKeyParameters Oct $ Base64Octets s
+
 postAuthJwtR :: Handler ()
 postAuthJwtR = do
     jwtInput <- lookupPostParam "assertion"
 
     when (isNothing jwtInput) $ permissionDenied "No assertion found in POST."
 
-    let
-        jwtInput' = BL.pack $ strToWord8s $ T.unpack $ fromJust jwtInput
-        j = JOSE.decodeCompact jwtInput' :: Either JOSE.Error JWT.JWT
-        jwt = getRight j
+    case decodeJWT (fromJust jwtInput) of
+         Left  _   -> permissionDenied "Could not decode JWT."
+         Right jwt -> do
+            let
+                jwk = encodeJWK secret
 
-        jwk :: JOSE.JWK
-        jwk = JOSE.JWK k z z z z z z z z
-            where z = Nothing
-                  k = OctKeyMaterial $ OctKeyParameters Oct $ Base64Octets secret
+                -- Things that I have to look up:
+                claimset = JWT.jwtClaimsSet jwt
+                iss      = JWT.claimIss claimset
+                audience = JWT.claimAud claimset
 
-        -- Things that I have to look up:
-        claimset = JWT.jwtClaimsSet jwt
-        iss      = JWT.claimIss claimset
-        audience = JWT.claimAud claimset
+                -- In the unregistered claims I will find things about
+                -- the user's institutional email, staff/student affiliation, etc.
+                unregisteredClaims = JWT.unregisteredClaims claimset
+                attributes         = HM.lookup "https://aaf.edu.au/attributes" unregisteredClaims
 
-        -- In the unregistered claims I will find things about
-        -- the user's institutional email, staff/student affiliation, etc.
-        unregisteredClaims = JWT.unregisteredClaims claimset
-        attributes         = HM.lookup "https://aaf.edu.au/attributes" unregisteredClaims
+                isvalid = JWT.validateJWSJWT jwk jwt
 
-        -- I guess that jwk should be a function of the secret?
-        isvalid = JWT.validateJWSJWT jwk jwt
+            when (audience /= (Just $ JWT.Special $ JWT.OrURI $ URI $ fromJust $ parseURI $ T.unpack configAudience)) $
+                permissionDenied $ "Not for this audience: "
 
-    when (audience /= (Just $ JWT.Special $ JWT.OrURI $ URI $ fromJust $ parseURI $ T.unpack configAudience)) $
-        permissionDenied $ "Not for this audience: " -- ++ show audience
+            when (iss /= (Just $ JWT.OrURI $ URI $ fromJust $ parseURI $ T.unpack configIss)) $
+                 permissionDenied "Issuer does not match."
 
-    when (iss /= (Just $ JWT.OrURI $ URI $ fromJust $ parseURI $ T.unpack configIss)) $
-         permissionDenied "Issuer does not match."
+            when (isNothing attributes) $
+                permissionDenied "Could not lookup AAF attributes."
 
-    when (isNothing attributes) $
-        permissionDenied "Could not lookup AAF attributes."
+            when (not isvalid) $
+                permissionDenied "Could not validate JWT."
 
-    when (not isvalid) $
-        permissionDenied "Could not validate JWT."
+            case (fromJSON $ fromJust attributes :: Result AAFAttributes) of
+                Success attributes' -> do
+                    -- Can set other attributes here, as required, or do auth stuff.
+                    setSession "aaf_cn"   $ aafCn   attributes'
+                    setSession "aaf_mail" $ aafMail attributes'
+                Error e             -> permissionDenied $ "Error: JSON error when decoding attributes: " `T.append` (T.pack e)
 
-    case (fromJSON $ fromJust attributes :: Result AAFAttributes) of
-        Success attributes' -> do
-            -- Can set other attributes here, as required, or do auth stuff.
-            setSession "aaf_cn"   $ aafCn   attributes'
-            setSession "aaf_mail" $ aafMail attributes'
-        Error e             -> permissionDenied $ "Error: JSON error when decoding attributes: " `T.append` (T.pack e)
+            -- Set claimset. Beware that decodeUtf8 can explode; use decodeUtf8' or similar.
+            setSession "jwt" (decodeUtf8 $ BSL.toStrict $ encode claimset)
 
-    -- Set claimset. Beware that decodeUtf8 can explode; use decodeUtf8' or similar.
-    setSession "jwt" (decodeUtf8 $ BSL.toStrict $ encode claimset)
-
-    redirect WelcomeR
+            redirect WelcomeR
