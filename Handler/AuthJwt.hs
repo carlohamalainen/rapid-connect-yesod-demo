@@ -22,7 +22,7 @@ import qualified Crypto.JWT as JWT
 import qualified Crypto.JOSE as JOSE
 import qualified Data.HashMap.Lazy as HM
 
-import Crypto.JOSE.JWA.JWK
+import Crypto.JOSE.JWK
 import Crypto.JOSE.Types
 
 import Data.Aeson
@@ -85,10 +85,7 @@ decodeJWT :: T.Text -> Either JOSE.Error JWT.JWT
 decodeJWT jwtInput = JOSE.decodeCompact $ BL.pack $ strToWord8s $ T.unpack jwtInput
 
 encodeJWK :: B.ByteString -> JOSE.JWK
-encodeJWK s = JOSE.JWK k z z z z z z z z
-  where
-    z = Nothing
-    k = OctKeyMaterial $ OctKeyParameters Oct $ Base64Octets s
+encodeJWK = JOSE.fromKeyContent . OctKeyMaterial . OctKeyParameters Oct . Base64Octets
 
 postAuthJwtR :: Handler ()
 postAuthJwtR = do
